@@ -1,0 +1,3486 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TINY ART agent API",
+    "version": "0.1.0",
+    "summary": "REST mirrors of the 15 TINY ART tools",
+    "description": "Weekly sealed second-price drops of numbered editions (Series 001, placeholder data). Amounts are integer EUR cents. One sealed bid per identity per lot, raises only. No single bid amount of another identity is ever shown before reveal. Test mode only.",
+    "contact": {
+      "name": "TINY ART support",
+      "email": "support@tinyart.es"
+    },
+    "license": {
+      "name": "Apache-2.0",
+      "identifier": "Apache-2.0"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://mcp.tinyart.es"
+    }
+  ],
+  "tags": [
+    {
+      "name": "public"
+    },
+    {
+      "name": "authenticated"
+    },
+    {
+      "name": "discovery"
+    },
+    {
+      "name": "protocols"
+    }
+  ],
+  "paths": {
+    "/api/agents": {
+      "post": {
+        "operationId": "register_agent",
+        "summary": "Register an agent identity",
+        "description": "Register one agent identity for one owner (one identity per owner). Gives back an API key once, and an owner secret that belongs to the human owner for approving confirmations. Optional owner-set budget cap and confirm-above threshold.",
+        "tags": [
+          "public"
+        ],
+        "x-tinyart-tool": "register_agent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent_name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "Display name of the agent"
+                  },
+                  "owner_handle": {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{2,63}$",
+                    "description": "Stable handle of the human or organisation that owns this agent. One identity per owner."
+                  },
+                  "callback_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 500,
+                    "description": "Where the owner wants confirmation callbacks (stored, not called in this version)"
+                  },
+                  "budget_cap_cents": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000000,
+                    "description": "Owner-set cap on the sum of open bids"
+                  },
+                  "confirm_above_cents": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000000,
+                    "description": "Actions strictly above this amount need an owner confirmation"
+                  },
+                  "owner_email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 254,
+                    "description": "Owner email. The owner may receive a sign-in invite by email; the link never passes through the agent."
+                  }
+                },
+                "required": [
+                  "agent_name",
+                  "owner_handle"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": [],
+        "responses": {
+          "201": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "agent_id": {
+                      "type": "string"
+                    },
+                    "identity_id": {
+                      "type": "string"
+                    },
+                    "owner_id": {
+                      "type": "string"
+                    },
+                    "api_key": {
+                      "type": "string",
+                      "description": "Shown once. Send as x-api-key or Authorization: Bearer."
+                    },
+                    "owner_secret": {
+                      "type": "string",
+                      "description": "Shown once. Belongs to the human owner; used to approve confirmation requests."
+                    },
+                    "scopes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "limits": {
+                      "type": "object",
+                      "properties": {
+                        "budget_cap_cents": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "confirm_above_cents": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "kyc_threshold_cents": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "budget_cap_cents",
+                        "confirm_above_cents",
+                        "kyc_threshold_cents"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "endpoints": {
+                      "type": "object",
+                      "properties": {
+                        "mcp": {
+                          "type": "string"
+                        },
+                        "a2a": {
+                          "type": "string"
+                        },
+                        "rest": {
+                          "type": "string"
+                        },
+                        "agent_card": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "mcp",
+                        "a2a",
+                        "rest",
+                        "agent_card"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "owner_invite": {
+                      "type": "string",
+                      "enum": [
+                        "sent",
+                        "not_sent",
+                        "skipped"
+                      ],
+                      "description": "skipped: no owner_email or no owner auth configured"
+                    },
+                    "notes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "agent_id",
+                    "identity_id",
+                    "owner_id",
+                    "api_key",
+                    "owner_secret",
+                    "scopes",
+                    "limits",
+                    "endpoints",
+                    "owner_invite",
+                    "notes"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict, for example the lot is not open or a bid already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bid rule violated (below minimum, or lower than your current bid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the window resets"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/drop": {
+      "get": {
+        "operationId": "get_drop",
+        "summary": "Get the current drop",
+        "description": "Current drop: one work, its calendar and its 10 numbered edition lot keys (sealed bids per number, 1/10..10/10). The original itself is exhibition only. Placeholder data for Series 001.",
+        "tags": [
+          "public"
+        ],
+        "x-tinyart-tool": "get_drop",
+        "parameters": [
+          {
+            "name": "drop_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Defaults to the current drop"
+            }
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "drop_id": {
+                      "type": "string"
+                    },
+                    "work_no": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 10,
+                      "description": "The one work (original) this drop sells; a drop holds exactly its 10 numbers"
+                    },
+                    "series": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "artist": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "preview",
+                        "bidding_open",
+                        "closed"
+                      ]
+                    },
+                    "timezone": {
+                      "type": "string"
+                    },
+                    "now": {
+                      "type": "string"
+                    },
+                    "preview_at": {
+                      "type": "string"
+                    },
+                    "bid_opens_at": {
+                      "type": "string"
+                    },
+                    "bid_closes_at": {
+                      "type": "string"
+                    },
+                    "bid_opens_display": {
+                      "type": "string"
+                    },
+                    "bid_closes_display": {
+                      "type": "string"
+                    },
+                    "originals": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "original_no": {
+                            "type": "integer"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "edition_count": {
+                            "type": "integer"
+                          },
+                          "lot_keys": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "lots_open": {
+                            "type": "integer"
+                          },
+                          "sku": {
+                            "type": "string",
+                            "description": "SKU of the original, S001-NN-ORIG. Exhibition only."
+                          },
+                          "exhibition_only": {
+                            "type": "boolean",
+                            "const": true,
+                            "description": "The original is shown, never sold, listed or bought through this API"
+                          },
+                          "edition_skus": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "SKUs of the 10 editions, S001-NN-E01..E10, same order as lot_keys"
+                          }
+                        },
+                        "required": [
+                          "original_no",
+                          "title",
+                          "edition_count",
+                          "lot_keys",
+                          "lots_open",
+                          "sku",
+                          "exhibition_only",
+                          "edition_skus"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "lots_total": {
+                      "type": "integer"
+                    },
+                    "notice": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "drop_id",
+                    "work_no",
+                    "series",
+                    "title",
+                    "artist",
+                    "status",
+                    "timezone",
+                    "now",
+                    "preview_at",
+                    "bid_opens_at",
+                    "bid_closes_at",
+                    "bid_opens_display",
+                    "bid_closes_display",
+                    "originals",
+                    "lots_total",
+                    "notice"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict, for example the lot is not open or a bid already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bid rule violated (below minimum, or lower than your current bid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the window resets"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lots/{lot_key}": {
+      "get": {
+        "operationId": "get_lot",
+        "summary": "Get one edition lot",
+        "description": "Public view of one edition lot. The reserve is secret and never shown. If authenticated, includes your own bid only.",
+        "tags": [
+          "public"
+        ],
+        "x-tinyart-tool": "get_lot",
+        "parameters": [
+          {
+            "name": "lot_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^series001-(0[1-9]|10)-(0[1-9]|10)$",
+              "description": "Edition lot key: series001-<original 01..10>-<edition 01..10>"
+            }
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "lot_key": {
+                      "type": "string"
+                    },
+                    "sku": {
+                      "type": "string",
+                      "description": "SKU of this edition, S001-NN-E01..E10"
+                    },
+                    "original_no": {
+                      "type": "integer"
+                    },
+                    "original_title": {
+                      "type": "string"
+                    },
+                    "edition_no": {
+                      "type": "integer"
+                    },
+                    "edition_label": {
+                      "type": "string"
+                    },
+                    "artist": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "scheduled",
+                        "open",
+                        "closed",
+                        "settling",
+                        "sold",
+                        "rolled",
+                        "void"
+                      ]
+                    },
+                    "bid_opens_at": {
+                      "type": "string"
+                    },
+                    "bid_closes_at": {
+                      "type": "string"
+                    },
+                    "min_bid_cents": {
+                      "type": "integer"
+                    },
+                    "reserve": {
+                      "type": "string",
+                      "const": "secret"
+                    },
+                    "bids_count": {
+                      "type": "integer"
+                    },
+                    "revealed": {
+                      "type": "boolean"
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "outcome": {
+                          "type": "string",
+                          "enum": [
+                            "sold",
+                            "rolled"
+                          ]
+                        },
+                        "price_paid_cents": {
+                          "type": "integer"
+                        },
+                        "you_won": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "outcome"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "your_bid": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "bid_id": {
+                              "type": "string"
+                            },
+                            "lot_key": {
+                              "type": "string"
+                            },
+                            "amount_cents": {
+                              "type": "integer",
+                              "description": "Your own bid. Other identities' bids are never shown."
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "sealed",
+                                "won",
+                                "lost",
+                                "void"
+                              ]
+                            },
+                            "raise_count": {
+                              "type": "integer"
+                            },
+                            "placed_at": {
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "type": "string"
+                            },
+                            "authorization": {
+                              "type": "object",
+                              "properties": {
+                                "status": {
+                                  "type": "string"
+                                },
+                                "expires_at": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "status",
+                                "expires_at"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "bid_id",
+                            "lot_key",
+                            "amount_cents",
+                            "status",
+                            "raise_count",
+                            "placed_at",
+                            "updated_at",
+                            "authorization"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "listing": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "listing_id": {
+                              "type": "string"
+                            },
+                            "mode": {
+                              "type": "string"
+                            },
+                            "price_cents": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "listing_id",
+                            "mode",
+                            "price_cents"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "lot_key",
+                    "sku",
+                    "original_no",
+                    "original_title",
+                    "edition_no",
+                    "edition_label",
+                    "artist",
+                    "status",
+                    "bid_opens_at",
+                    "bid_closes_at",
+                    "min_bid_cents",
+                    "reserve",
+                    "bids_count",
+                    "revealed",
+                    "your_bid",
+                    "listing"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict, for example the lot is not open or a bid already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bid rule violated (below minimum, or lower than your current bid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the window resets"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/signals": {
+      "get": {
+        "operationId": "get_signals",
+        "summary": "Get market signals",
+        "description": "Aggregate activity signals for the series or one lot: bid counts, unique bidders, time left. No bid amounts. Historical sale data is published only after reveal.",
+        "tags": [
+          "authenticated"
+        ],
+        "x-tinyart-tool": "get_signals",
+        "parameters": [
+          {
+            "name": "lot_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^series001-(0[1-9]|10)-(0[1-9]|10)$",
+              "description": "Edition lot key: series001-<original 01..10>-<edition 01..10>"
+            }
+          }
+        ],
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "series",
+                        "lot"
+                      ]
+                    },
+                    "lot_key": {
+                      "type": "string"
+                    },
+                    "bids_count": {
+                      "type": "integer"
+                    },
+                    "unique_bidders": {
+                      "type": "integer"
+                    },
+                    "lots_with_bids": {
+                      "type": "integer"
+                    },
+                    "seconds_to_close": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "history": {
+                      "type": "object",
+                      "properties": {
+                        "revealed_lots": {
+                          "type": "integer"
+                        },
+                        "sold": {
+                          "type": "integer"
+                        },
+                        "rolled": {
+                          "type": "integer"
+                        },
+                        "note": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "revealed_lots",
+                        "sold",
+                        "rolled",
+                        "note"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "amounts": {
+                      "type": "string",
+                      "const": "not published before reveal"
+                    }
+                  },
+                  "required": [
+                    "scope",
+                    "bids_count",
+                    "unique_bidders",
+                    "lots_with_bids",
+                    "seconds_to_close",
+                    "history",
+                    "amounts"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient scope or owner confirmation invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict, for example the lot is not open or a bid already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bid rule violated (below minimum, or lower than your current bid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the window resets"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lots/{lot_key}/appraisal": {
+      "get": {
+        "operationId": "appraise",
+        "summary": "Reference points for a lot",
+        "description": "Reference points for one lot from published data only (minimum bid, revealed results in the series) plus a dry-run of the owner guardrails for a chosen amount. Makes no change.",
+        "tags": [
+          "authenticated"
+        ],
+        "x-tinyart-tool": "appraise",
+        "parameters": [
+          {
+            "name": "lot_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^series001-(0[1-9]|10)-(0[1-9]|10)$",
+              "description": "Edition lot key: series001-<original 01..10>-<edition 01..10>"
+            }
+          },
+          {
+            "name": "amount_cents",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000000,
+              "description": "Amount to dry-run against your guardrails"
+            }
+          }
+        ],
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "lot_key": {
+                      "type": "string"
+                    },
+                    "reference_points": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "cents": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "cents"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "revealed_results_in_series": {
+                      "type": "integer"
+                    },
+                    "how_second_price_works": {
+                      "type": "string"
+                    },
+                    "guardrail_preview": {
+                      "type": "object",
+                      "properties": {
+                        "decision": {
+                          "type": "string",
+                          "enum": [
+                            "allow",
+                            "confirm",
+                            "block"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "decision",
+                        "reasons"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "disclaimer": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "lot_key",
+                    "reference_points",
+                    "revealed_results_in_series",
+                    "how_second_price_works",
+                    "disclaimer"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient scope or owner confirmation invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict, for example the lot is not open or a bid already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bid rule violated (below minimum, or lower than your current bid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the window resets"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lots/{lot_key}/bids": {
+      "post": {
+        "operationId": "place_sealed_bid",
+        "summary": "Place a sealed bid",
+        "description": "Place the one sealed bid of this identity on an open lot. Runs the owner guardrails first and answers allow, confirm or block. On confirm nothing is placed until the owner approves and the call is repeated with owner_confirmation_token. Use raise_bid to change an existing bid.",
+        "tags": [
+          "authenticated"
+        ],
+        "x-tinyart-tool": "place_sealed_bid",
+        "parameters": [
+          {
+            "name": "lot_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "pattern": "^(series001-(0[1-9]|10)-((0[1-9]|10)|orig|original)|S001-(0[1-9]|10)-(E(0[1-9]|10)|ORIG))$",
+              "description": "Edition lot key (series001-<01..10>-<01..10>) or edition SKU (S001-<01..10>-E<01..10>). Exhibition-only originals (S001-NN-ORIG) are rejected with EXHIBITION_ONLY."
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amount_cents": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100000000,
+                    "description": "Integer EUR cents, at least 1"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 100,
+                    "description": "Repeating a call with the same key gives the original result"
+                  },
+                  "owner_confirmation_token": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 200,
+                    "description": "Owner confirmation token. Needed only after a decision of confirm; issued to the owner, never to the agent."
+                  }
+                },
+                "required": [
+                  "amount_cents"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "decision": {
+                      "type": "string",
+                      "enum": [
+                        "allow",
+                        "confirm",
+                        "block"
+                      ],
+                      "description": "Guardrail decision from the core guardrailDecision function"
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "owner_confirmed": {
+                      "type": "boolean"
+                    },
+                    "confirmation": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string"
+                        },
+                        "expires_at": {
+                          "type": "string"
+                        },
+                        "approval_url": {
+                          "type": "string"
+                        },
+                        "instructions": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "request_id",
+                        "expires_at",
+                        "approval_url",
+                        "instructions"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "placed": {
+                      "type": "boolean"
+                    },
+                    "idempotent_replay": {
+                      "type": "boolean"
+                    },
+                    "bid": {
+                      "type": "object",
+                      "properties": {
+                        "bid_id": {
+                          "type": "string"
+                        },
+                        "lot_key": {
+                          "type": "string"
+                        },
+                        "amount_cents": {
+                          "type": "integer",
+                          "description": "Your own bid. Other identities' bids are never shown."
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "sealed",
+                            "won",
+                            "lost",
+                            "void"
+                          ]
+                        },
+                        "raise_count": {
+                          "type": "integer"
+                        },
+                        "placed_at": {
+                          "type": "string"
+                        },
+                        "updated_at": {
+                          "type": "string"
+                        },
+                        "authorization": {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string"
+                            },
+                            "expires_at": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "expires_at"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "bid_id",
+                        "lot_key",
+                        "amount_cents",
+                        "status",
+                        "raise_count",
+                        "placed_at",
+                        "updated_at",
+                        "authorization"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "decision",
+                    "reasons",
+                    "owner_confirmed",
+                    "placed"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient scope or owner confirmation invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict, for example the lot is not open or a bid already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bid rule violated (below minimum, or lower than your current bid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the window resets"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lots/{lot_key}/bids/me": {
+      "patch": {
+        "operationId": "raise_bid",
+        "summary": "Raise your sealed bid",
+        "description": "Raise the existing sealed bid of this identity on an open lot. Raises only: the new amount must be strictly higher. Same guardrail decision and confirmation flow as place_sealed_bid.",
+        "tags": [
+          "authenticated"
+        ],
+        "x-tinyart-tool": "raise_bid",
+        "parameters": [
+          {
+            "name": "lot_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "pattern": "^(series001-(0[1-9]|10)-((0[1-9]|10)|orig|original)|S001-(0[1-9]|10)-(E(0[1-9]|10)|ORIG))$",
+              "description": "Edition lot key (series001-<01..10>-<01..10>) or edition SKU (S001-<01..10>-E<01..10>). Exhibition-only originals (S001-NN-ORIG) are rejected with EXHIBITION_ONLY."
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "new_amount_cents": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100000000,
+                    "description": "Integer EUR cents, at least 1"
+                  },
+                  "owner_confirmation_token": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 200,
+                    "description": "Owner confirmation token. Needed only after a decision of confirm; issued to the owner, never to the agent."
+                  }
+                },
+                "required": [
+                  "new_amount_cents"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "decision": {
+                      "type": "string",
+                      "enum": [
+                        "allow",
+                        "confirm",
+                        "block"
+                      ],
+                      "description": "Guardrail decision from the core guardrailDecision function"
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "owner_confirmed": {
+                      "type": "boolean"
+                    },
+                    "confirmation": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string"
+                        },
+                        "expires_at": {
+                          "type": "string"
+                        },
+                        "approval_url": {
+                          "type": "string"
+                        },
+                        "instructions": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "request_id",
+                        "expires_at",
+                        "approval_url",
+                        "instructions"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "raised": {
+                      "type": "boolean"
+                    },
+                    "previous_amount_cents": {
+                      "type": "integer"
+                    },
+                    "bid": {
+                      "type": "object",
+                      "properties": {
+                        "bid_id": {
+                          "type": "string"
+                        },
+                        "lot_key": {
+                          "type": "string"
+                        },
+                        "amount_cents": {
+                          "type": "integer",
+                          "description": "Your own bid. Other identities' bids are never shown."
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "sealed",
+                            "won",
+                            "lost",
+                            "void"
+                          ]
+                        },
+                        "raise_count": {
+                          "type": "integer"
+                        },
+                        "placed_at": {
+                          "type": "string"
+                        },
+                        "updated_at": {
+                          "type": "string"
+                        },
+                        "authorization": {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string"
+                            },
+                            "expires_at": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "expires_at"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "bid_id",
+                        "lot_key",
+                        "amount_cents",
+                        "status",
+                        "raise_count",
+                        "placed_at",
+                        "updated_at",
+                        "authorization"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "decision",
+                    "reasons",
+                    "owner_confirmed",
+                    "raised"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient scope or owner confirmation invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict, for example the lot is not open or a bid already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bid rule violated (below minimum, or lower than your current bid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the window resets"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "get_bid_status",
+        "summary": "Status of your bid on a lot",
+        "description": "Your own bid on a lot and its outcome. Never shows another identity's bid. After reveal, shows whether you won and the price paid if you did.",
+        "tags": [
+          "authenticated"
+        ],
+        "x-tinyart-tool": "get_bid_status",
+        "parameters": [
+          {
+            "name": "lot_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^series001-(0[1-9]|10)-(0[1-9]|10)$",
+              "description": "Edition lot key: series001-<original 01..10>-<edition 01..10>"
+            }
+          }
+        ],
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "lot_key": {
+                      "type": "string"
+                    },
+                    "has_bid": {
+                      "type": "boolean"
+                    },
+                    "lot_status": {
+                      "type": "string",
+                      "enum": [
+                        "scheduled",
+                        "open",
+                        "closed",
+                        "settling",
+                        "sold",
+                        "rolled",
+                        "void"
+                      ]
+                    },
+                    "revealed": {
+                      "type": "boolean"
+                    },
+                    "outcome": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "won",
+                        "lost",
+                        "rolled"
+                      ]
+                    },
+                    "price_paid_cents": {
+                      "type": "integer"
+                    },
+                    "bid": {
+                      "type": "object",
+                      "properties": {
+                        "bid_id": {
+                          "type": "string"
+                        },
+                        "lot_key": {
+                          "type": "string"
+                        },
+                        "amount_cents": {
+                          "type": "integer",
+                          "description": "Your own bid. Other identities' bids are never shown."
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "sealed",
+                            "won",
+                            "lost",
+                            "void"
+                          ]
+                        },
+                        "raise_count": {
+                          "type": "integer"
+                        },
+                        "placed_at": {
+                          "type": "string"
+                        },
+                        "updated_at": {
+                          "type": "string"
+                        },
+                        "authorization": {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string"
+                            },
+                            "expires_at": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "expires_at"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "bid_id",
+                        "lot_key",
+                        "amount_cents",
+                        "status",
+                        "raise_count",
+                        "placed_at",
+                        "updated_at",
+                        "authorization"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "lot_key",
+                    "has_bid",
+                    "lot_status",
+                    "revealed",
+                    "outcome"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient scope or owner confirmation invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict, for example the lot is not open or a bid already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bid rule violated (below minimum, or lower than your current bid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the window resets"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/listings": {
+      "post": {
+        "operationId": "list_for_sale",
+        "summary": "List (or delist) an edition you hold",
+        "description": "List an edition you hold for sale on the secondary market after the 14-day hold, or cancel your active listing. Buy Now listings are fully supported here. Ascending-auction listings are created but bidding on them happens in the web app.",
+        "tags": [
+          "authenticated"
+        ],
+        "x-tinyart-tool": "list_for_sale",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "lot_key": {
+                    "type": "string",
+                    "maxLength": 40,
+                    "pattern": "^(series001-(0[1-9]|10)-((0[1-9]|10)|orig|original)|S001-(0[1-9]|10)-(E(0[1-9]|10)|ORIG))$",
+                    "description": "Edition lot key (series001-<01..10>-<01..10>) or edition SKU (S001-<01..10>-E<01..10>). Exhibition-only originals (S001-NN-ORIG) are rejected with EXHIBITION_ONLY."
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "list",
+                      "cancel"
+                    ],
+                    "default": "list"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "buy_now",
+                      "ascending_auction"
+                    ],
+                    "default": "buy_now"
+                  },
+                  "price_cents": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100000000,
+                    "description": "Buy Now price, or the starting price of an ascending auction"
+                  }
+                },
+                "required": [
+                  "lot_key"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                      "enum": [
+                        "list",
+                        "cancel"
+                      ]
+                    },
+                    "listing": {
+                      "type": "object",
+                      "properties": {
+                        "listing_id": {
+                          "type": "string"
+                        },
+                        "lot_key": {
+                          "type": "string"
+                        },
+                        "mode": {
+                          "type": "string"
+                        },
+                        "price_cents": {
+                          "type": "integer"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "closes_at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "listing_id",
+                        "lot_key",
+                        "mode",
+                        "price_cents",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "fee_estimate": {
+                      "type": "object",
+                      "properties": {
+                        "platform_fee_cents": {
+                          "type": "integer"
+                        },
+                        "artist_resale_right_cents": {
+                          "type": "integer"
+                        },
+                        "seller_net_cents": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "platform_fee_cents",
+                        "artist_resale_right_cents",
+                        "seller_net_cents"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "bidding_channel": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "action"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient scope or owner confirmation invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict, for example the lot is not open or a bid already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bid rule violated (below minimum, or lower than your current bid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the window resets"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/listings/{listing_id}/buy": {
+      "post": {
+        "operationId": "buy_now",
+        "summary": "Buy a Buy Now listing",
+        "description": "Buy a Buy Now listing at its listed price. Runs the owner guardrails; on confirm nothing is bought until the owner approves and the call is repeated with owner_confirmation_token.",
+        "tags": [
+          "authenticated"
+        ],
+        "x-tinyart-tool": "buy_now",
+        "parameters": [
+          {
+            "name": "listing_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 64,
+              "description": "Listing id, or the lot key / edition SKU of the listed edition. Exhibition-only originals (S001-NN-ORIG) are rejected with EXHIBITION_ONLY."
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "owner_confirmation_token": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 200,
+                    "description": "Owner confirmation token. Needed only after a decision of confirm; issued to the owner, never to the agent."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "decision": {
+                      "type": "string",
+                      "enum": [
+                        "allow",
+                        "confirm",
+                        "block"
+                      ],
+                      "description": "Guardrail decision from the core guardrailDecision function"
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "owner_confirmed": {
+                      "type": "boolean"
+                    },
+                    "confirmation": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string"
+                        },
+                        "expires_at": {
+                          "type": "string"
+                        },
+                        "approval_url": {
+                          "type": "string"
+                        },
+                        "instructions": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "request_id",
+                        "expires_at",
+                        "approval_url",
+                        "instructions"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "purchased": {
+                      "type": "boolean"
+                    },
+                    "receipt": {
+                      "type": "object",
+                      "properties": {
+                        "listing_id": {
+                          "type": "string"
+                        },
+                        "lot_key": {
+                          "type": "string"
+                        },
+                        "price_cents": {
+                          "type": "integer"
+                        },
+                        "capture_id": {
+                          "type": "string"
+                        },
+                        "platform_fee_cents": {
+                          "type": "integer"
+                        },
+                        "artist_resale_right_cents": {
+                          "type": "integer"
+                        },
+                        "seller_net_cents": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "listing_id",
+                        "lot_key",
+                        "price_cents",
+                        "capture_id",
+                        "platform_fee_cents",
+                        "artist_resale_right_cents",
+                        "seller_net_cents"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "decision",
+                    "reasons",
+                    "owner_confirmed",
+                    "purchased"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient scope or owner confirmation invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict, for example the lot is not open or a bid already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bid rule violated (below minimum, or lower than your current bid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the window resets"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lots/{lot_key}/transfer": {
+      "post": {
+        "operationId": "transfer",
+        "summary": "Transfer an edition you hold",
+        "description": "Transfer an edition you hold to another registered identity (no sale). Always needs an owner confirmation token. The receiving identity starts a new hold period.",
+        "tags": [
+          "authenticated"
+        ],
+        "x-tinyart-tool": "transfer",
+        "parameters": [
+          {
+            "name": "lot_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^series001-(0[1-9]|10)-(0[1-9]|10)$",
+              "description": "Edition lot key: series001-<original 01..10>-<edition 01..10>"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "to_identity_id": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 64
+                  },
+                  "owner_confirmation_token": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 200,
+                    "description": "Owner confirmation token. Needed only after a decision of confirm; issued to the owner, never to the agent."
+                  }
+                },
+                "required": [
+                  "to_identity_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "decision": {
+                      "type": "string",
+                      "enum": [
+                        "allow",
+                        "confirm",
+                        "block"
+                      ],
+                      "description": "Guardrail decision from the core guardrailDecision function"
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "owner_confirmed": {
+                      "type": "boolean"
+                    },
+                    "confirmation": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string"
+                        },
+                        "expires_at": {
+                          "type": "string"
+                        },
+                        "approval_url": {
+                          "type": "string"
+                        },
+                        "instructions": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "request_id",
+                        "expires_at",
+                        "approval_url",
+                        "instructions"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "transferred": {
+                      "type": "boolean"
+                    },
+                    "lot_key": {
+                      "type": "string"
+                    },
+                    "new_hold_until": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "decision",
+                    "reasons",
+                    "owner_confirmed",
+                    "transferred",
+                    "lot_key"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient scope or owner confirmation invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict, for example the lot is not open or a bid already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bid rule violated (below minimum, or lower than your current bid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the window resets"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lots/{lot_key}/certificate": {
+      "get": {
+        "operationId": "get_certificate",
+        "summary": "Certificate and provenance of an edition",
+        "description": "Certificate record and provenance events of one edition. Holder identities are shown as short aliases; only you see whether you hold it. Placeholder until the certificate service issues signed certificates.",
+        "tags": [
+          "public"
+        ],
+        "x-tinyart-tool": "get_certificate",
+        "parameters": [
+          {
+            "name": "lot_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^series001-(0[1-9]|10)-(0[1-9]|10)$",
+              "description": "Edition lot key: series001-<original 01..10>-<edition 01..10>"
+            }
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "lot_key": {
+                      "type": "string"
+                    },
+                    "certificate_status": {
+                      "type": "string",
+                      "const": "placeholder"
+                    },
+                    "artist": {
+                      "type": "string"
+                    },
+                    "series": {
+                      "type": "string"
+                    },
+                    "original_no": {
+                      "type": "integer"
+                    },
+                    "original_title": {
+                      "type": "string"
+                    },
+                    "edition_label": {
+                      "type": "string"
+                    },
+                    "custody": {
+                      "type": "string",
+                      "enum": [
+                        "vault"
+                      ]
+                    },
+                    "held": {
+                      "type": "boolean"
+                    },
+                    "held_by_you": {
+                      "type": "boolean"
+                    },
+                    "holder_alias": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "provenance": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "at": {
+                            "type": "string"
+                          },
+                          "price_paid_cents": {
+                            "type": "integer"
+                          },
+                          "from": {
+                            "type": "string"
+                          },
+                          "to": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "at"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "document_sha256": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "lot_key",
+                    "certificate_status",
+                    "artist",
+                    "series",
+                    "original_no",
+                    "original_title",
+                    "edition_label",
+                    "custody",
+                    "held",
+                    "held_by_you",
+                    "holder_alias",
+                    "provenance",
+                    "document_sha256"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict, for example the lot is not open or a bid already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bid rule violated (below minimum, or lower than your current bid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the window resets"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/verify-tap": {
+      "post": {
+        "operationId": "verify_tap",
+        "summary": "Verify an NFC card tap",
+        "description": "Verify a card tap (uid, counter, mac) and gives the edition it belongs to. Replayed or unknown taps are rejected. Uses a development verifier in this version.",
+        "tags": [
+          "public"
+        ],
+        "x-tinyart-tool": "verify_tap",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "uid": {
+                    "type": "string",
+                    "pattern": "^[0-9a-fA-F]{14}$",
+                    "description": "7-byte card UID, hex"
+                  },
+                  "counter": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 16777215,
+                    "description": "Tap read counter"
+                  },
+                  "mac": {
+                    "type": "string",
+                    "pattern": "^[0-9a-fA-F]{16}$",
+                    "description": "Tap MAC, 8 bytes hex"
+                  }
+                },
+                "required": [
+                  "uid",
+                  "counter",
+                  "mac"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valid": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "unknown_uid",
+                        "bad_mac",
+                        "replay"
+                      ]
+                    },
+                    "lot_key": {
+                      "type": "string"
+                    },
+                    "certificate_path": {
+                      "type": "string"
+                    },
+                    "verifier": {
+                      "type": "string",
+                      "const": "development"
+                    }
+                  },
+                  "required": [
+                    "valid",
+                    "reason",
+                    "verifier"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict, for example the lot is not open or a bid already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bid rule violated (below minimum, or lower than your current bid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the window resets"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/counter": {
+      "get": {
+        "operationId": "get_counter",
+        "summary": "Public counter",
+        "description": "Public aggregates only. No single bid amount is shown before the full reveal after close.",
+        "tags": [
+          "public"
+        ],
+        "x-tinyart-tool": "get_counter",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "as_of": {
+                      "type": "string"
+                    },
+                    "series": {
+                      "type": "string"
+                    },
+                    "lots": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "scheduled": {
+                          "type": "integer"
+                        },
+                        "open": {
+                          "type": "integer"
+                        },
+                        "closed": {
+                          "type": "integer"
+                        },
+                        "sold": {
+                          "type": "integer"
+                        },
+                        "rolled": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "scheduled",
+                        "open",
+                        "closed",
+                        "sold",
+                        "rolled"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "bids_total": {
+                      "type": "integer"
+                    },
+                    "bidders_unique": {
+                      "type": "integer"
+                    },
+                    "lots_with_bids": {
+                      "type": "integer"
+                    },
+                    "agents_registered": {
+                      "type": "integer"
+                    },
+                    "revealed": {
+                      "type": "object",
+                      "properties": {
+                        "lots": {
+                          "type": "integer"
+                        },
+                        "sold_count": {
+                          "type": "integer"
+                        },
+                        "total_paid_cents": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "lots",
+                        "sold_count",
+                        "total_paid_cents"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "policy": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "as_of",
+                    "series",
+                    "lots",
+                    "bids_total",
+                    "bidders_unique",
+                    "lots_with_bids",
+                    "agents_registered",
+                    "revealed",
+                    "policy"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict, for example the lot is not open or a bid already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bid rule violated (below minimum, or lower than your current bid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the window resets"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rules": {
+      "get": {
+        "operationId": "get_rules",
+        "summary": "Published market rules",
+        "description": "The published TINY ART market rules. States that no buy-back floor is promised; the published approach is: resale market + first right of refusal.",
+        "tags": [
+          "public"
+        ],
+        "x-tinyart-tool": "get_rules",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "const": "EUR"
+                    },
+                    "money_unit": {
+                      "type": "string"
+                    },
+                    "rules": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "bidding": {
+                      "type": "object",
+                      "properties": {
+                        "one_sealed_bid_per_identity_per_lot": {
+                          "type": "boolean",
+                          "const": true
+                        },
+                        "raises_only": {
+                          "type": "boolean",
+                          "const": true
+                        },
+                        "pricing": {
+                          "type": "string",
+                          "const": "second-price"
+                        },
+                        "reserve": {
+                          "type": "string",
+                          "const": "secret"
+                        }
+                      },
+                      "required": [
+                        "one_sealed_bid_per_identity_per_lot",
+                        "raises_only",
+                        "pricing",
+                        "reserve"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "buyback": {
+                      "type": "object",
+                      "properties": {
+                        "floor_promised": {
+                          "type": "boolean",
+                          "const": false
+                        },
+                        "copy": {
+                          "type": "string"
+                        },
+                        "feature_flag_enabled": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "floor_promised",
+                        "copy",
+                        "feature_flag_enabled"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "fees": {
+                      "type": "object",
+                      "properties": {
+                        "primary_artist_pct": {
+                          "type": "number"
+                        },
+                        "primary_fund_pct": {
+                          "type": "number"
+                        },
+                        "primary_platform_pct": {
+                          "type": "number"
+                        },
+                        "secondary_platform_fee_pct": {
+                          "type": "number"
+                        },
+                        "secondary_hold_days": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "primary_artist_pct",
+                        "primary_fund_pct",
+                        "primary_platform_pct",
+                        "secondary_platform_fee_pct",
+                        "secondary_hold_days"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "source": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "currency",
+                    "money_unit",
+                    "rules",
+                    "bidding",
+                    "buyback",
+                    "fees",
+                    "source"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict, for example the lot is not open or a bid already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bid rule violated (below minimum, or lower than your current bid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the window resets"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/agent-card.json": {
+      "get": {
+        "summary": "A2A Agent Card",
+        "tags": [
+          "discovery"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "A2A Agent Card",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agents.md": {
+      "get": {
+        "summary": "Guide for agents",
+        "tags": [
+          "discovery"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Guide for agents",
+            "content": {
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/llms.txt": {
+      "get": {
+        "summary": "llms.txt index",
+        "tags": [
+          "discovery"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "llms.txt index",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mcp": {
+      "post": {
+        "summary": "MCP Streamable HTTP endpoint (JSON-RPC)",
+        "tags": [
+          "protocols"
+        ],
+        "description": "Stateless Streamable HTTP. Send JSON-RPC requests; tools are the same as the /api mirrors.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON-RPC response"
+          },
+          "401": {
+            "description": "Credentials needed for the requested tool",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/a2a": {
+      "post": {
+        "summary": "A2A JSON-RPC endpoint",
+        "tags": [
+          "protocols"
+        ],
+        "description": "Methods: SendMessage, GetTask, ListTasks, CancelTask.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "bearer": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON-RPC response"
+          },
+          "401": {
+            "description": "Credentials needed for the requested skill",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "Issued by register_agent"
+      },
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API key"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

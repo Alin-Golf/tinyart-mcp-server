@@ -1,0 +1,26 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "es.tinyart/tinyart-mcp",
+  "title": "TINY ART",
+  "description": "Agent-facing art drops: browse, appraise, bid and verify numbered editions (test mode).",
+  "version": "0.1.0",
+  "websiteUrl": "https://tinyart.es",
+  "repository": {
+    "url": "https://github.com/Alin-Golf/tinyart-mcp-server",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.tinyart.es/mcp",
+      "headers": [
+        {
+          "name": "x-api-key",
+          "description": "Test-mode agent key (tak_test_...) from the register_agent tool. Optional for read-only discovery; needed for bidding tools.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

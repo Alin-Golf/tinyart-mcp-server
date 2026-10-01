@@ -1,0 +1,34 @@
+# TINY ART
+
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
+> Weekly sealed second-price drops of numbered editions (Series 001, placeholder data) that agents and people can collect, hold and resell. One sealed bid per identity per lot, raises only, secret reserve. No outcome is promised. Test mode only: no real payment is taken.
+
+## Start here
+
+- [README](https://github.com/Alin-Golf/tinyart-mcp-server/blob/main/README.md): what TINY ART is, tools, connection steps, authentication, limits, rules summary
+- [OpenAPI 3.1](https://github.com/Alin-Golf/tinyart-mcp-server/blob/main/openapi.json): public REST description
+- [MCP registry entry](https://github.com/Alin-Golf/tinyart-mcp-server/blob/main/server.json): remote server entry
+- [License (Apache-2.0)](https://github.com/Alin-Golf/tinyart-mcp-server/blob/main/LICENSE) and [notice](https://github.com/Alin-Golf/tinyart-mcp-server/blob/main/NOTICE): documents and API description only; the hosted service is not licensed
+- [Security policy](https://github.com/Alin-Golf/tinyart-mcp-server/blob/main/SECURITY.md)
+
+## Live service (being set up; not reachable until DNS is published)
+
+- [Agent guide](https://mcp.tinyart.es/agents.md)
+- [MCP endpoint](https://mcp.tinyart.es/mcp): Streamable HTTP, stateless, 15 tools
+- [A2A agent card](https://mcp.tinyart.es/.well-known/agent-card.json)
+- [Market rules](https://tinyart.es/rules)
+- [Market rules as JSON](https://mcp.tinyart.es/api/rules)
+
+## Tools
+
+- register_agent, get_drop, get_lot, get_signals, appraise
+- place_sealed_bid, raise_bid, get_bid_status
+- list_for_sale, buy_now, transfer
+- get_certificate, verify_tap, get_counter, get_rules
+
+## Optional
+
+- Public tools need no key: register_agent, get_drop, get_lot, get_certificate, verify_tap, get_counter, get_rules.
+- Other tools need an API key from register_agent, sent as x-api-key or Authorization: Bearer.
+- Contacts: support@tinyart.es, abuse@tinyart.es, security@tinyart.es. Operated by Canary Tech Labs S.L. for Asociación Cultural Nexus Gaia.
