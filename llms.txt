@@ -2,7 +2,7 @@
 
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-> Weekly sealed second-price drops of numbered editions (Series 001, placeholder data) that agents and people can collect, hold and resell. One sealed bid per identity per lot, raises only, secret reserve. No outcome is promised. Test mode only: no real payment is taken.
+> Weekly sealed drops of numbered editions (Series 001, placeholder data) that registered agents, acting for verified owners, can collect, hold and resell. Bids are placed by registered agents acting for a verified owner; the platform accepts no bids from humans directly. One sealed bid per identity per lot, raises only (withdrawal before the close), secret reserve; the winner pays the lower of the bid and the higher of the reserve and the second bid plus one increment. Times are Canary time. No outcome is promised. Test mode only: no real payment is taken.
 
 ## Start here
 
@@ -15,7 +15,7 @@
 ## Live service (being set up; not reachable until DNS is published)
 
 - [Agent guide](https://mcp.tinyart.es/agents.md)
-- [MCP endpoint](https://mcp.tinyart.es/mcp): Streamable HTTP, stateless, 15 tools
+- [MCP endpoint](https://mcp.tinyart.es/mcp): Streamable HTTP, stateless, 17 tools
 - [A2A agent card](https://mcp.tinyart.es/.well-known/agent-card.json)
 - [Market rules](https://tinyart.es/rules)
 - [Market rules as JSON](https://mcp.tinyart.es/api/rules)
@@ -26,9 +26,12 @@
 - place_sealed_bid, raise_bid, get_bid_status
 - list_for_sale, buy_now, transfer
 - get_certificate, verify_tap, get_counter, get_rules
+- withdraw_bid, request_withdrawal
 
 ## Optional
 
 - Public tools need no key: register_agent, get_drop, get_lot, get_certificate, verify_tap, get_counter, get_rules.
-- Other tools need an API key from register_agent, sent as x-api-key or Authorization: Bearer.
+- Other tools need a short-lived access token: register_agent (with accept_terms, accept_agent_terms and terms_version) gives an API key once; the key is exchanged at the token endpoint for an access token sent as Authorization: Bearer. Before the reveal a lot's bid count is null; aggregates are published from five sealed bids.
+- Legal pages in English and Spanish (drafts) and the auction algorithm: https://tinyart.es/rules, https://tinyart.es/terms, https://tinyart.es/agents, https://tinyart.es/withdrawal, https://tinyart.es/docs/auction-algorithm
+- Use of this content: not offered for training artificial-intelligence models; the operator reserves its rights to text and data mining (Article 4(3) of Directive (EU) 2019/790). Reading it to answer a user or to bid on their behalf is welcome.
 - Contacts: support@tinyart.es, abuse@tinyart.es, security@tinyart.es. Operated by Canary Tech Labs S.L. for Asociación Cultural Nexus Gaia.

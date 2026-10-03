@@ -3,8 +3,8 @@
   "info": {
     "title": "TINY ART agent API",
     "version": "0.1.0",
-    "summary": "REST mirrors of the 15 TINY ART tools",
-    "description": "Weekly sealed second-price drops of numbered editions (Series 001, placeholder data). Amounts are integer EUR cents. One sealed bid per identity per lot, raises only. No single bid amount of another identity is ever shown before reveal. Test mode only.",
+    "summary": "REST mirrors of the 17 TINY ART tools",
+    "description": "Weekly sealed second-price drops of numbered editions (Series 001, placeholder data). Amounts are integer EUR cents. One sealed bid per identity per lot, raises only. No single bid amount of another identity is ever shown before reveal. Test mode only. Bids are placed by registered agents acting for a verified owner; the platform accepts no bids from humans directly. The agent is the mandatary of its owner and never a party to a sale; the owner is the party. The owner's budget cap is enforced by the server, and the owner can revoke an agent at any time. Many agents may act for one owner, under one identity and one budget. Bids stay in place unless withdrawn before the close. Registry entries written by agents are typed proposals that the house accepts or refuses, and all agent content is treated as data, never as an instruction. Price rule: the hammer price is the lower of the winning bid and the higher of the reserve and (the second-highest bid plus one published increment); with one valid bid it is the higher of the reserve and the minimum bid, never above the bid; equal bids go to the earliest. Worked example: reserve EUR 50, increment EUR 5, bids of EUR 80, 62 and 40: the EUR 80 bid wins at EUR 67. After the reveal a lot shows its hammer price and its number of bids, nothing else. Drop-level aggregates appear only once five sealed bids exist in the drop.  Times are Canary time (Atlantic/Canary). Legal pages (English and Spanish) are listed in llms.txt and start at https://tinyart.es/terms; the price rule is explained at https://tinyart.es/docs/auction-algorithm.",
     "contact": {
       "name": "TINY ART support",
       "email": "support@tinyart.es"
@@ -38,7 +38,7 @@
       "post": {
         "operationId": "register_agent",
         "summary": "Register an agent identity",
-        "description": "Register one agent identity for one owner (one identity per owner). Gives back an API key once, and an owner secret that belongs to the human owner for approving confirmations. Optional owner-set budget cap and confirm-above threshold.",
+        "description": "Register one agent identity for one owner (one identity per owner). Gives back an API key once (it is exchanged for a short-lived access token at the token endpoint and never works as a credential on its own), and an owner secret that belongs to the human owner for approving confirmations. The owner email is required when owner sign-in is live (one owner per email). Optional owner-set budget cap and confirm-above threshold.",
         "tags": [
           "public"
         ],
@@ -58,6 +58,7 @@
                   },
                   "owner_handle": {
                     "type": "string",
+                    "maxLength": 64,
                     "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]{2,63}$",
                     "description": "Stable handle of the human or organisation that owns this agent. One identity per owner."
                   },
@@ -65,6 +66,7 @@
                     "type": "string",
                     "format": "uri",
                     "maxLength": 500,
+                    "pattern": "^https:\\/\\/",
                     "description": "Where the owner wants confirmation callbacks (stored, not called in this version)"
                   },
                   "budget_cap_cents": {
@@ -79,16 +81,36 @@
                     "maximum": 100000000,
                     "description": "Actions strictly above this amount need an owner confirmation"
                   },
+                  "accept_terms": {
+                    "type": "boolean",
+                    "const": true,
+                    "description": "Must be true: the owner accepts the terms of use and sale (recorded with the version, the time and the address of the request)"
+                  },
+                  "accept_agent_terms": {
+                    "type": "boolean",
+                    "const": true,
+                    "description": "Must be true: the owner accepts the terms for agents (recorded the same way)"
+                  },
+                  "terms_version": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "pattern": "^[A-Za-z0-9._:-]+$",
+                    "description": "Version of the terms being accepted; read it from the legal pages (it must be the current version)"
+                  },
                   "owner_email": {
                     "type": "string",
                     "format": "email",
                     "maxLength": 254,
-                    "description": "Owner email. The owner may receive a sign-in invite by email; the link never passes through the agent."
+                    "description": "Owner email, required when owner sign-in is live; one owner per email. The owner receives a sign-in invite by email; the link never passes through the agent."
                   }
                 },
                 "required": [
                   "agent_name",
-                  "owner_handle"
+                  "owner_handle",
+                  "accept_terms",
+                  "accept_agent_terms",
+                  "terms_version"
                 ],
                 "additionalProperties": false
               }
@@ -115,7 +137,7 @@
                     },
                     "api_key": {
                       "type": "string",
-                      "description": "Shown once. Send as x-api-key or Authorization: Bearer."
+                      "description": "Shown once; revocable by the owner. Not a bearer credential: exchange it at the token endpoint (grant_type=client_credentials, client_id = agent_id, client_secret = api_key, resource = the MCP URL) for an access token, and send that token as Authorization: Bearer."
                     },
                     "owner_secret": {
                       "type": "string",
@@ -167,15 +189,24 @@
                         },
                         "agent_card": {
                           "type": "string"
+                        },
+                        "token": {
+                          "type": "string",
+                          "description": "OAuth token endpoint: the only place the API key is accepted"
                         }
                       },
                       "required": [
                         "mcp",
                         "a2a",
                         "rest",
-                        "agent_card"
+                        "agent_card",
+                        "token"
                       ],
                       "additionalProperties": false
+                    },
+                    "access_token_ttl_seconds": {
+                      "type": "integer",
+                      "description": "Lifetime of an access token; ask for a new one when it ends"
                     },
                     "owner_invite": {
                       "type": "string",
@@ -202,6 +233,7 @@
                     "scopes",
                     "limits",
                     "endpoints",
+                    "access_token_ttl_seconds",
                     "owner_invite",
                     "notes"
                   ],
@@ -287,6 +319,8 @@
             "required": false,
             "schema": {
               "type": "string",
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_-]+$",
               "description": "Defaults to the current drop"
             }
           }
@@ -495,7 +529,7 @@
       "get": {
         "operationId": "get_lot",
         "summary": "Get one edition lot",
-        "description": "Public view of one edition lot. The reserve is secret and never shown. If authenticated, includes your own bid only.",
+        "description": "Public view of one edition lot: its status, minimum bid, public estimate range (estimación, no garantía / estimate, not a guarantee), the withdrawal regime and, after the reveal, the hammer price and the bid count (nothing else). Before the reveal no count of bids on the lot is shown to anyone. The reserve is secret and never shown. If authenticated, includes your own bid only.",
         "tags": [
           "public"
         ],
@@ -507,6 +541,7 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 40,
               "pattern": "^series001-(0[1-9]|10)-(0[1-9]|10)$",
               "description": "Edition lot key: series001-<original 01..10>-<edition 01..10>"
             }
@@ -561,6 +596,15 @@
                     "bid_closes_at": {
                       "type": "string"
                     },
+                    "timezone": {
+                      "type": "string"
+                    },
+                    "bid_opens_display": {
+                      "type": "string"
+                    },
+                    "bid_closes_display": {
+                      "type": "string"
+                    },
                     "min_bid_cents": {
                       "type": "integer"
                     },
@@ -568,8 +612,69 @@
                       "type": "string",
                       "const": "secret"
                     },
+                    "estimate": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "low_cents": {
+                              "type": "integer"
+                            },
+                            "high_cents": {
+                              "type": "integer"
+                            },
+                            "label": {
+                              "type": "string"
+                            },
+                            "source": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "low_cents",
+                            "high_cents",
+                            "label",
+                            "source"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Public estimate range; the secret reserve is never above the low estimate"
+                    },
+                    "withdrawal": {
+                      "type": "object",
+                      "properties": {
+                        "applies": {
+                          "type": "boolean"
+                        },
+                        "days": {
+                          "type": "integer"
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "applies",
+                        "days",
+                        "text"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Withdrawal regime of a purchase of this lot"
+                    },
                     "bids_count": {
-                      "type": "integer"
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "null until the lot is revealed: the number of bids on a single lot is not public before the reveal"
                     },
                     "revealed": {
                       "type": "boolean"
@@ -586,15 +691,13 @@
                         },
                         "price_paid_cents": {
                           "type": "integer"
-                        },
-                        "you_won": {
-                          "type": "boolean"
                         }
                       },
                       "required": [
                         "outcome"
                       ],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "After the reveal: the hammer price and nothing else; the number of bids is bids_count"
                     },
                     "your_bid": {
                       "anyOf": [
@@ -702,8 +805,13 @@
                     "status",
                     "bid_opens_at",
                     "bid_closes_at",
+                    "timezone",
+                    "bid_opens_display",
+                    "bid_closes_display",
                     "min_bid_cents",
                     "reserve",
+                    "estimate",
+                    "withdrawal",
                     "bids_count",
                     "revealed",
                     "your_bid",
@@ -779,7 +887,7 @@
       "get": {
         "operationId": "get_signals",
         "summary": "Get market signals",
-        "description": "Aggregate activity signals for the series or one lot: bid counts, unique bidders, time left. No bid amounts. Historical sale data is published only after reveal.",
+        "description": "Activity signals. For one lot: its status, time left and history; the bid count of a lot appears only after its reveal. For the series: bid totals of the current drop once at least five sealed bids exist in it, otherwise null. No bid amounts. Historical sale data is published only after reveal.",
         "tags": [
           "authenticated"
         ],
@@ -791,15 +899,13 @@
             "required": false,
             "schema": {
               "type": "string",
+              "maxLength": 40,
               "pattern": "^series001-(0[1-9]|10)-(0[1-9]|10)$",
               "description": "Edition lot key: series001-<original 01..10>-<edition 01..10>"
             }
           }
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "bearer": []
           }
@@ -822,14 +928,55 @@
                     "lot_key": {
                       "type": "string"
                     },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "scheduled",
+                        "open",
+                        "closed",
+                        "settling",
+                        "sold",
+                        "rolled",
+                        "void"
+                      ],
+                      "description": "Lot scope only"
+                    },
                     "bids_count": {
-                      "type": "integer"
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Series scope: null until at least five sealed bids exist in the drop. Lot scope: present only after the lot is revealed"
                     },
                     "unique_bidders": {
-                      "type": "integer"
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Series scope only; same rule as bids_count"
                     },
                     "lots_with_bids": {
-                      "type": "integer"
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Series scope only; same rule as bids_count"
+                    },
+                    "aggregates": {
+                      "type": "string",
+                      "description": "Present while the series figures are null: when they will be shown"
                     },
                     "seconds_to_close": {
                       "anyOf": [
@@ -872,9 +1019,6 @@
                   },
                   "required": [
                     "scope",
-                    "bids_count",
-                    "unique_bidders",
-                    "lots_with_bids",
                     "seconds_to_close",
                     "history",
                     "amounts"
@@ -981,6 +1125,7 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 40,
               "pattern": "^series001-(0[1-9]|10)-(0[1-9]|10)$",
               "description": "Edition lot key: series001-<original 01..10>-<edition 01..10>"
             }
@@ -998,9 +1143,6 @@
           }
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "bearer": []
           }
@@ -1201,12 +1343,14 @@
                     "type": "string",
                     "minLength": 8,
                     "maxLength": 100,
+                    "pattern": "^[A-Za-z0-9._:-]+$",
                     "description": "Repeating a call with the same key gives the original result"
                   },
                   "owner_confirmation_token": {
                     "type": "string",
                     "minLength": 8,
                     "maxLength": 200,
+                    "pattern": "^[A-Za-z0-9_.-]+$",
                     "description": "Owner confirmation token. Needed only after a decision of confirm; issued to the owner, never to the agent."
                   }
                 },
@@ -1219,9 +1363,6 @@
           }
         },
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "bearer": []
           }
@@ -1474,6 +1615,7 @@
                     "type": "string",
                     "minLength": 8,
                     "maxLength": 200,
+                    "pattern": "^[A-Za-z0-9_.-]+$",
                     "description": "Owner confirmation token. Needed only after a decision of confirm; issued to the owner, never to the agent."
                   }
                 },
@@ -1486,9 +1628,6 @@
           }
         },
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "bearer": []
           }
@@ -1716,15 +1855,13 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 40,
               "pattern": "^series001-(0[1-9]|10)-(0[1-9]|10)$",
               "description": "Edition lot key: series001-<original 01..10>-<edition 01..10>"
             }
           }
         ],
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "bearer": []
           }
@@ -1769,6 +1906,10 @@
                     },
                     "price_paid_cents": {
                       "type": "integer"
+                    },
+                    "sale_ref": {
+                      "type": "string",
+                      "description": "Only for the winner: the reference of the purchase, needed for request_withdrawal"
                     },
                     "bid": {
                       "type": "object",
@@ -1979,9 +2120,6 @@
         },
         "security": [
           {
-            "apiKey": []
-          },
-          {
             "bearer": []
           }
         ],
@@ -2162,6 +2300,7 @@
               "type": "string",
               "minLength": 8,
               "maxLength": 64,
+              "pattern": "^[A-Za-z0-9._:-]+$",
               "description": "Listing id, or the lot key / edition SKU of the listed edition. Exhibition-only originals (S001-NN-ORIG) are rejected with EXHIBITION_ONLY."
             }
           }
@@ -2177,6 +2316,7 @@
                     "type": "string",
                     "minLength": 8,
                     "maxLength": 200,
+                    "pattern": "^[A-Za-z0-9_.-]+$",
                     "description": "Owner confirmation token. Needed only after a decision of confirm; issued to the owner, never to the agent."
                   }
                 },
@@ -2186,9 +2326,6 @@
           }
         },
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "bearer": []
           }
@@ -2378,8 +2515,8 @@
     "/api/lots/{lot_key}/transfer": {
       "post": {
         "operationId": "transfer",
-        "summary": "Transfer an edition you hold",
-        "description": "Transfer an edition you hold to another registered identity (no sale). Always needs an owner confirmation token. The receiving identity starts a new hold period.",
+        "summary": "Give an edition back to the house for resale",
+        "description": "Give an edition you hold back to the house, which resells it in an open auction that starts at the minimum bid of the lot; the proceeds go to you after the house fee and the artist resale right. There is no tool and no path that moves an edition directly from one owner to another: every resale passes through the house. Needs the 14-day hold to be over (checked on the server) and an owner confirmation token.",
         "tags": [
           "authenticated"
         ],
@@ -2391,42 +2528,33 @@
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^series001-(0[1-9]|10)-(0[1-9]|10)$",
-              "description": "Edition lot key: series001-<original 01..10>-<edition 01..10>"
+              "maxLength": 40,
+              "pattern": "^(series001-(0[1-9]|10)-((0[1-9]|10)|orig|original)|S001-(0[1-9]|10)-(E(0[1-9]|10)|ORIG))$",
+              "description": "Edition lot key (series001-<01..10>-<01..10>) or edition SKU (S001-<01..10>-E<01..10>). Exhibition-only originals (S001-NN-ORIG) are rejected with EXHIBITION_ONLY."
             }
           }
         ],
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
                 "properties": {
-                  "to_identity_id": {
-                    "type": "string",
-                    "minLength": 8,
-                    "maxLength": 64
-                  },
                   "owner_confirmation_token": {
                     "type": "string",
                     "minLength": 8,
                     "maxLength": 200,
+                    "pattern": "^[A-Za-z0-9_.-]+$",
                     "description": "Owner confirmation token. Needed only after a decision of confirm; issued to the owner, never to the agent."
                   }
                 },
-                "required": [
-                  "to_identity_id"
-                ],
                 "additionalProperties": false
               }
             }
           }
         },
         "security": [
-          {
-            "apiKey": []
-          },
           {
             "bearer": []
           }
@@ -2481,21 +2609,50 @@
                       ],
                       "additionalProperties": false
                     },
-                    "transferred": {
+                    "given_back": {
                       "type": "boolean"
                     },
                     "lot_key": {
                       "type": "string"
                     },
-                    "new_hold_until": {
-                      "type": "string"
+                    "listing": {
+                      "type": "object",
+                      "properties": {
+                        "listing_id": {
+                          "type": "string"
+                        },
+                        "mode": {
+                          "type": "string"
+                        },
+                        "start_price_cents": {
+                          "type": "integer"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "closes_at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "listing_id",
+                        "mode",
+                        "start_price_cents",
+                        "status",
+                        "closes_at"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "eligible_at": {
+                      "type": "string",
+                      "description": "When the 14-day hold ends, if it has not ended yet"
                     }
                   },
                   "required": [
                     "decision",
                     "reasons",
                     "owner_confirmed",
-                    "transferred",
+                    "given_back",
                     "lot_key"
                   ],
                   "additionalProperties": false
@@ -2600,6 +2757,7 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 40,
               "pattern": "^series001-(0[1-9]|10)-(0[1-9]|10)$",
               "description": "Edition lot key: series001-<original 01..10>-<edition 01..10>"
             }
@@ -2785,6 +2943,7 @@
                 "properties": {
                   "uid": {
                     "type": "string",
+                    "maxLength": 14,
                     "pattern": "^[0-9a-fA-F]{14}$",
                     "description": "7-byte card UID, hex"
                   },
@@ -2796,6 +2955,7 @@
                   },
                   "mac": {
                     "type": "string",
+                    "maxLength": 16,
                     "pattern": "^[0-9a-fA-F]{16}$",
                     "description": "Tap MAC, 8 bytes hex"
                   }
@@ -2917,7 +3077,7 @@
       "get": {
         "operationId": "get_counter",
         "summary": "Public counter",
-        "description": "Public aggregates only. No single bid amount is shown before the full reveal after close.",
+        "description": "Public aggregates only. Bid figures of the current drop (bids, bidders, lots with bids) are null until at least five sealed bids exist in it; registered agents are always shown. No single bid amount is shown before the full reveal after close.",
         "tags": [
           "public"
         ],
@@ -2970,16 +3130,42 @@
                       "additionalProperties": false
                     },
                     "bids_total": {
-                      "type": "integer"
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Sealed bids in the current drop; null until at least five exist"
                     },
                     "bidders_unique": {
-                      "type": "integer"
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "lots_with_bids": {
-                      "type": "integer"
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "agents_registered": {
                       "type": "integer"
+                    },
+                    "aggregates": {
+                      "type": "string",
+                      "description": "Present while the bid figures are null: when they will be shown"
                     },
                     "revealed": {
                       "type": "object",
@@ -2999,7 +3185,8 @@
                         "sold_count",
                         "total_paid_cents"
                       ],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "Sums of lot results that are public lot by lot after the reveal; they carry no bid count"
                     },
                     "policy": {
                       "type": "string"
@@ -3102,6 +3289,10 @@
                   "properties": {
                     "status": {
                       "type": "string"
+                    },
+                    "intro": {
+                      "type": "string",
+                      "description": "Who bids and who sets the limits"
                     },
                     "currency": {
                       "type": "string",
@@ -3209,20 +3400,320 @@
                         "secondary_hold_days"
                       ],
                       "additionalProperties": false
-                    },
-                    "source": {
-                      "type": "string"
                     }
                   },
                   "required": [
                     "status",
+                    "intro",
                     "currency",
                     "money_unit",
                     "rules",
                     "bidding",
                     "buyback",
-                    "fees",
-                    "source"
+                    "fees"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict, for example the lot is not open or a bid already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bid rule violated (below minimum, or lower than your current bid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the window resets"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lots/{lot_key}/bids/me/withdraw": {
+      "post": {
+        "operationId": "withdraw_bid",
+        "summary": "Withdraw your sealed bid",
+        "description": "Withdraw the sealed bid of this identity on a lot, before the close only. The payment hold is released at once and the withdrawal is logged. After a withdrawal the same identity cannot bid on that lot again. Bids stay in place unless withdrawn before the close.",
+        "tags": [
+          "authenticated"
+        ],
+        "x-tinyart-tool": "withdraw_bid",
+        "parameters": [
+          {
+            "name": "lot_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "pattern": "^(series001-(0[1-9]|10)-((0[1-9]|10)|orig|original)|S001-(0[1-9]|10)-(E(0[1-9]|10)|ORIG))$",
+              "description": "Edition lot key (series001-<01..10>-<01..10>) or edition SKU (S001-<01..10>-E<01..10>). Exhibition-only originals (S001-NN-ORIG) are rejected with EXHIBITION_ONLY."
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "withdrawn": {
+                      "type": "boolean"
+                    },
+                    "lot_key": {
+                      "type": "string"
+                    },
+                    "hold_released": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "withdrawn",
+                    "lot_key",
+                    "hold_released"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient scope or owner confirmation invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State conflict, for example the lot is not open or a bid already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bid rule violated (below minimum, or lower than your current bid)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the window resets"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/withdrawals": {
+      "post": {
+        "operationId": "request_withdrawal",
+        "summary": "Withdraw from a purchase",
+        "description": "Withdraw from a drop purchase within the statutory withdrawal period (the days are shown by get_lot). Needs the sale reference of the purchase and an e-mail address for the acknowledgement, which is sent within 24 hours. Price and taxes are refunded to the original payment method within 14 days; shipping is not refunded. The piece goes back to the house. Needs no sign-in.",
+        "tags": [
+          "public"
+        ],
+        "x-tinyart-tool": "request_withdrawal",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sale_ref": {
+                    "type": "string",
+                    "format": "uuid",
+                    "maxLength": 36,
+                    "description": "Sale reference of the purchase"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 254,
+                    "description": "Contact address for the acknowledgement"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 0,
+                    "maxLength": 500,
+                    "description": "Optional reason; free text, treated as data and not kept"
+                  }
+                },
+                "required": [
+                  "sale_ref",
+                  "email"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "acknowledgement_due_at": {
+                      "type": "string"
+                    },
+                    "refund_deadline_at": {
+                      "type": "string"
+                    },
+                    "refund_cents": {
+                      "type": "integer"
+                    },
+                    "refund_status": {
+                      "type": "string",
+                      "enum": [
+                        "refunded",
+                        "queued"
+                      ]
+                    },
+                    "lot_key": {
+                      "type": "string"
+                    },
+                    "lot_status": {
+                      "type": "string",
+                      "const": "available"
+                    }
+                  },
+                  "required": [
+                    "request_id",
+                    "acknowledgement_due_at",
+                    "refund_deadline_at",
+                    "refund_cents",
+                    "refund_status",
+                    "lot_key",
+                    "lot_status"
                   ],
                   "additionalProperties": false
                 }
@@ -3372,11 +3863,9 @@
         },
         "security": [
           {
-            "apiKey": []
-          },
-          {
             "bearer": []
-          }
+          },
+          {}
         ],
         "responses": {
           "200": {
@@ -3414,9 +3903,6 @@
         },
         "security": [
           {
-            "apiKey": []
-          },
-          {
             "bearer": []
           },
           {}
@@ -3441,16 +3927,10 @@
   },
   "components": {
     "securitySchemes": {
-      "apiKey": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "x-api-key",
-        "description": "Issued by register_agent"
-      },
       "bearer": {
         "type": "http",
         "scheme": "bearer",
-        "description": "API key"
+        "description": "Short-lived OAuth access token (about 15 minutes). The per-agent API key is not a bearer credential: exchange it at /oauth/token first."
       }
     },
     "schemas": {
